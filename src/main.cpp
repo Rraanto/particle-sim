@@ -1,7 +1,7 @@
-#include <GLFW/glfw3.h>
 #include <cmath>
 #include <filesystem>
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <string>
@@ -11,6 +11,7 @@
 #include "compiler/preprocessor/preprocessor.h"
 
 #include "camera/camera.h"
+#include "render/render.h"
 
 static void error_callback(int error, const char *description);
 
@@ -62,63 +63,18 @@ int main() {
   }
 
   /*
-   * Loading and compiling shaders
+   * Initialise renderer
    */
-  Compiler compiler;
-
   std::filesystem::path v_shader_path =
       std::filesystem::path(SHADERS_DIR) / "vertex_shader.glsl";
   std::filesystem::path f_shader_path =
       std::filesystem::path(SHADERS_DIR) / "fragment_shader.glsl";
-
-  // vertex shader
-  Compiler::CompileOutput compile_output;
-
-  compile_output = compiler.compile(v_shader_path, GL_VERTEX_SHADER);
-
-  if (!compile_output.success) {
-    std::cerr << compile_output.error << std::endl;
+  ParticleRenderer renderer;
+  if (!renderer.init(v_shader_path, f_shader_path)) {
     glfwDestroyWindow(window);
     glfwTerminate();
     return EXIT_FAILURE;
   }
-
-  GLuint vertex_shader = compile_output.shader;
-
-  // fragment shader
-  compile_output = compiler.compile(f_shader_path, GL_FRAGMENT_SHADER, true);
-  if (!compile_output.success) {
-    std::cerr << compile_output.error << std::endl;
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    return EXIT_FAILURE;
-  }
-
-  GLuint fragment_shader = compile_output.shader;
-
-  GLuint shader_program = glCreateProgram();
-  glAttachShader(shader_program, vertex_shader);
-  glAttachShader(shader_program, fragment_shader);
-  glLinkProgram(shader_program);
-
-  int success = 0;
-  char info_log[512] = {0};
-  glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
-  if (!success) {
-    glGetProgramInfoLog(shader_program, 512, nullptr, info_log);
-    std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << info_log << "\n";
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
-    glDeleteProgram(shader_program);
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    return EXIT_FAILURE;
-  }
-
-  glDeleteShader(vertex_shader);
-  glDeleteShader(fragment_shader);
-
-  glUseProgram(shader_program);
 
   /*
    * Preparing the viewport: a single 2D rectangle (two triangles)
@@ -156,18 +112,14 @@ int main() {
                         _dimension * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
 
-  // we use a single shader program for the whole run
-  // so it's enough to set the prg once
-  glUseProgram(shader_program);
-
   /*
    * Initialising a 2D scene
    */
   // coords of the seahorse valley
 
   // an interesting point
-  float _p_x = -0.214268;
-  float _p_y = 0.652873;
+  float _p_x = 0.0;
+  float _p_y = 0.0;
   Camera camera(_p_x, _p_y);
   camera.zoom_in(0.8);
 
@@ -209,7 +161,7 @@ int main() {
     glUniform1f(loc_time_uniform, time);
 
     // rendering
-    glDrawArrays(GL_TRIANGLES, 0, _vertex_count);
+    glDrawArrays(GL_POINTS, 0, _vertex_count);
 
     glfwSwapBuffers(window);
   }
