@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <iostream>
 
 #include "compiler.h"
@@ -31,7 +32,7 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
 
   this->_fragment_shader = compile_output.shader;
 
-  // attach shaders to a program
+  // associate shader program
   this->_shader_program = glCreateProgram();
 
   glAttachShader(this->_shader_program, this->_vertex_shader);
@@ -56,14 +57,103 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
   glUseProgram(this->_shader_program);
 
   // VAO and VBO setup
-  unsigned int VBO;
-  glGenBuffers(1, &VBO);
+  this->_vao = 0;
+  glGenVertexArrays(1, &this->_vao);
+  glBindVertexArray(this->_vao);
 
-  unsigned int VAO;
-  glGenVertexArrays(1, &VAO);
-  glBindVertexArray(VAO);
+  this->_vbo = 0;
+  glGenBuffers(1, &this->_vbo);
 
   // copy vertices array to those memory
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, this->_vbo);
+
+  glBufferData(GL_ARRAY_BUFFER,
+               static_cast<GLsizeiptr>(
+                   static_cast<long unsigned int>(this->_max_particles) *
+                   sizeof(RenderParticle)),
+               nullptr, GL_DYNAMIC_DRAW);
+
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(RenderParticle),
+                        (void *)0);
+  glEnableVertexAttribArray(0);
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+
   return true;
+}
+
+void ParticleRenderer::upload_particles(const std::vector<float> &pos_x,
+                                        const std::vector<float> &pos_y,
+                                        std::vector<int> classes) {
+
+  // count amount of particle classes, abort if none
+  size_t count = std::min(pos_x.size(), pos_y.size());
+  if (!classes.empty()) {
+    count = std::min(count, classes.size());
+  }
+  if (count == 0) {
+    return;
+  }
+
+  // check if max amount of particles not reached
+  if (count > static_cast<size_t>(this->_max_particles)) {
+    this->_max_particles = static_cast<int>(count);
+    glBindBuffer(GL_ARRAY_BUFFER, this->_vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(
+                     static_cast<long unsigned int>(this->_max_particles) *
+                     sizeof(RenderParticle)),
+                 nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
+
+  std::vector<RenderParticle> particles;
+  particles.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    RenderParticle p;
+    p.x = pos_x[i];
+    p.y = pos_y[i];
+    if (i < classes.size()) {
+      p.class_id = classes[i];
+    }
+    particles.push_back(p);
+  }
+
+  glBindBuffer(GL_ARRAY_BUFFER, this->_vbo);
+  glBufferSubData(
+      GL_ARRAY_BUFFER, 0,
+      static_cast<GLsizeiptr>(particles.size() * sizeof(RenderParticle)),
+      particles.data());
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void ParticleRenderer::draw(size_t count) {
+  if (count == 0) {
+    return;
+  }
+
+  glUseProgram(this->_shader_program);
+  glBindVertexArray(this->_vao);
+
+  // draw the <count> first particles
+  glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(count));
+  glBindVertexArray(0);
+}
+
+void ParticleRenderer::shutdown() {
+  if (this->_vbo != 0u) {
+    glDeleteBuffers(1, &this->_vbo);
+    this->_vbo = 0;
+  }
+
+  if (this->_vao != 0u) {
+    glDeleteVertexArrays(1, &this->_vao);
+    this->_vao = 0;
+  }
+
+  if (this->_shader_program != 0u) {
+    glDeleteProgram(this->_shader_program);
+    this->_shader_program = 0;
+  }
 }

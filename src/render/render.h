@@ -14,6 +14,12 @@
 
 #include "camera.h"
 
+struct RenderParticle {
+  float x = 0.0f;
+  float y = 0.0f;
+  int class_id = 0;
+};
+
 class ParticleRenderer {
 private:
   GLuint _vertex_shader;
@@ -21,8 +27,10 @@ private:
   GLuint _shader_program;
 
   // vertex objects
-  unsigned int _vbo;
-  unsigned int _vao;
+  GLuint _vbo;
+  GLuint _vao;
+
+  int _max_particles = 100; // max amount of particles
 
 public:
   /*

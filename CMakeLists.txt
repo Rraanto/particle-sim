@@ -41,8 +41,8 @@ add_library(render STATIC src/render/render.cpp)
 target_include_directories(render PRIVATE src/render src/camera src/compiler/compiler)
 target_link_libraries(render PRIVATE glfw glad compiler camera)
 
-add_library(simulation STATIC src/simulation/simulation.cpp)
-target_include_directories(simulation PRIVATE src/simulation)
+add_library(simulation STATIC src/simulation/simulation.cpp src/simulation/spatial_grid.cpp)
+target_include_directories(simulation PUBLIC src/simulation)
 
 # Main executable 
 add_executable(main src/main.cpp)
@@ -53,6 +53,7 @@ target_link_libraries(main
   glad
   compiler
   render
+  simulation
 )
 target_compile_definitions(main PRIVATE SHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders") # expose to executables to load shaders at runtime
 
