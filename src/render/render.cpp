@@ -56,6 +56,12 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
 
   glUseProgram(this->_shader_program);
 
+  this->_u_center = glGetUniformLocation(this->_shader_program, "uCenter");
+  this->_u_scale = glGetUniformLocation(this->_shader_program, "uScale");
+  this->_u_zoom = glGetUniformLocation(this->_shader_program, "uZoom");
+  this->_u_aspect = glGetUniformLocation(this->_shader_program, "uAspect");
+  this->_u_time = glGetUniformLocation(this->_shader_program, "uTime");
+
   // VAO and VBO setup
   this->_vao = 0;
   glGenVertexArrays(1, &this->_vao);
@@ -128,12 +134,30 @@ void ParticleRenderer::upload_particles(const std::vector<float> &pos_x,
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void ParticleRenderer::draw(size_t count) {
+void ParticleRenderer::draw(size_t count, const Camera &camera, float aspect,
+                            float time_sec) {
   if (count == 0) {
     return;
   }
 
   glUseProgram(this->_shader_program);
+
+  if (this->_u_center >= 0) {
+    glUniform2f(this->_u_center, camera.get_x(), camera.get_y());
+  }
+  if (this->_u_scale >= 0) {
+    glUniform1f(this->_u_scale, camera.get_scale());
+  }
+  if (this->_u_zoom >= 0) {
+    glUniform1f(this->_u_zoom, camera.get_zoom());
+  }
+  if (this->_u_aspect >= 0) {
+    glUniform1f(this->_u_aspect, aspect);
+  }
+  if (this->_u_time >= 0) {
+    glUniform1f(this->_u_time, time_sec);
+  }
+
   glBindVertexArray(this->_vao);
 
   // draw the <count> first particles

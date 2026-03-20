@@ -3,17 +3,17 @@
 
 void Camera::move(const float &horizontal_stride,
                   const float &vertical_stride) {
-  this->_center_x += horizontal_stride * this->_zoom_factor;
-  this->_center_y += vertical_stride * this->_zoom_factor;
+  this->_center_x += horizontal_stride;
+  this->_center_y += vertical_stride;
 }
 
-float Camera::get_x() { return this->_center_x; }
+float Camera::get_x() const { return this->_center_x; }
 
-float Camera::get_y() { return this->_center_y; }
+float Camera::get_y() const { return this->_center_y; }
 
-float Camera::get_zoom() { return this->_zoom_factor; }
+float Camera::get_zoom() const { return this->_zoom_factor; }
 
-float Camera::get_scale() { return this->_scale; }
+float Camera::get_scale() const { return this->_scale; }
 
 void Camera::zoom_in(const float &stride) {
   this->_zoom_factor = std::max(

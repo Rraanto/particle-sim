@@ -32,6 +32,12 @@ private:
 
   int _max_particles = 100; // max amount of particles
 
+  GLint _u_center = -1;
+  GLint _u_scale = -1;
+  GLint _u_zoom = -1;
+  GLint _u_aspect = -1;
+  GLint _u_time = -1;
+
 public:
   /*
    * Initialises shader program:
@@ -55,7 +61,7 @@ public:
   /*
    * draws the specified amount of particles
    */
-  void draw(size_t count);
+  void draw(size_t count, const Camera &camera, float aspect, float time_sec);
 
   /*
    * shutdown

@@ -18,7 +18,7 @@ private:
 
   // minimum zoom factor allowed
   float _min_zoom_factor = 1e-20;
-  float _max_zoom_factor = 1.0;
+  float _max_zoom_factor = 10.0;
 
   float _center_x, _center_y;
   float _zoom_factor; // the smaller the zoom factor the closer things appear
@@ -28,10 +28,10 @@ public:
   Camera(const float &x, const float &y)
       : _center_x(x), _center_y(y), _zoom_factor(1.0), _scale(10.0) {}
 
-  float get_x();
-  float get_y();
-  float get_zoom();
-  float get_scale();
+  float get_x() const;
+  float get_y() const;
+  float get_zoom() const;
+  float get_scale() const;
 
   /*
    * moves with the specified strides
