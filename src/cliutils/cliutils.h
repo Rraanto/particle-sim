@@ -15,6 +15,9 @@ struct SimConfig {
   size_t particles_per_class = 1000;
   bool attraction_enabled = false;
   float attraction_strength = 1.0f;
+  float interaction_radius = 1.0f;
+  float damping = 1.0f;
+  float grid_cell_size = 0.2f;
 };
 
 /*

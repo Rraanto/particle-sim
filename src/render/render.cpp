@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 
 #include "compiler.h"
@@ -82,6 +83,10 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(RenderParticle),
                         (void *)0);
   glEnableVertexAttribArray(0);
+
+  glVertexAttribIPointer(1, 1, GL_INT, sizeof(RenderParticle),
+                         (void *)offsetof(RenderParticle, class_id));
+  glEnableVertexAttribArray(1);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);

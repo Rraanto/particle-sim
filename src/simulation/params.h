@@ -23,7 +23,7 @@ struct SimulationParams {
   float damping = 1.0f;
   float max_speed = 4.0f;
 
-  float interaction_radius = 0.2f;
+  float interaction_radius = 1.0f;
   float grid_cell_size = 0.2f;
 
   bool wrap_bounds = false;

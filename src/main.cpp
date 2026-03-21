@@ -125,7 +125,22 @@ int main(int argc, char **argv) {
     glfwTerminate();
     return EXIT_FAILURE;
   }
-  Simulation simulation(kParticles, kClasses);
+  SimulationParams sim_params;
+  sim_params.particle_count = kParticles;
+  sim_params.class_count = kClasses;
+  sim_params.interaction_radius = sim_config.interaction_radius;
+  sim_params.damping = sim_config.damping;
+  sim_params.grid_cell_size = sim_config.grid_cell_size;
+
+  std::vector<ClassParams> class_params(kClasses);
+  ForceParams force_params;
+  force_params.class_count = kClasses;
+  if (sim_config.attraction_enabled) {
+    force_params.strength = sim_config.attraction_strength;
+    force_params.attraction.assign(kClasses * kClasses, 1.0f);
+  }
+
+  Simulation simulation(sim_params, class_params, force_params);
   if (simulation.size() != kParticles || simulation.class_count() != kClasses) {
     std::cerr << "Simulation init failed: expected " << kParticles
               << " particles and " << kClasses << " classes, got "
@@ -135,14 +150,6 @@ int main(int argc, char **argv) {
     glfwDestroyWindow(window);
     glfwTerminate();
     return EXIT_FAILURE;
-  }
-
-  if (sim_config.attraction_enabled) {
-    ForceParams force_params;
-    force_params.class_count = kClasses;
-    force_params.strength = sim_config.attraction_strength;
-    force_params.attraction.assign(kClasses * kClasses, 1.0f);
-    simulation.set_force_params(force_params);
   }
 
   std::mt19937 rng(std::random_device{}());
