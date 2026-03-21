@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 #include <random>
 #include <string>
 #include <array>
@@ -35,11 +36,16 @@ struct InputState {
   bool dragging = false;
   double last_x = 0.0;
   double last_y = 0.0;
+  double cursor_x = 0.0;
+  double cursor_y = 0.0;
+  bool cursor_valid = false;
   Camera *camera = nullptr;
 };
 
 static bool map_key_to_action(int key, Action &out_action);
 static void apply_input(const InputState &input, Camera &camera);
+static void apply_mouse_drag(InputState &input, Camera &camera,
+                             GLFWwindow *window);
 
 int main() {
 
@@ -121,7 +127,7 @@ int main() {
   for (size_t i = 0; i < kParticles; ++i) {
     const float x = dist_x(rng);
     const float y = dist_y(rng);
-    simulation.set_particle(i, x, y, 0.0f, 0.0f, 0);
+    simulation.set_particle(i, x, y, 0.5f, 0.5f, 0);
   }
 
   if (simulation.pos_x().size() != simulation.pos_y().size() ||
@@ -141,12 +147,34 @@ int main() {
   /*
    * main loop
    */
+  double last_time = glfwGetTime();
+  double accumulator = 0.0;
+  const double fixed_dt = 1.0 / 60.0;
   while (!glfwWindowShouldClose(window)) {
     int w, h;
     glfwPollEvents();
 
     // Input step (separate from simulation/rendering).
     apply_input(input_state, camera);
+    apply_mouse_drag(input_state, camera, window);
+
+    const double now = glfwGetTime();
+    double frame_dt = now - last_time;
+    last_time = now;
+    if (frame_dt < 0.0) {
+      frame_dt = 0.0;
+    }
+    // Prevent huge catch-up steps if the event loop stalls.
+    if (frame_dt > 0.25) {
+      frame_dt = 0.25;
+    }
+    accumulator += frame_dt;
+    while (accumulator >= fixed_dt) {
+      simulation.step(static_cast<float>(fixed_dt));
+      accumulator -= fixed_dt;
+    }
+    renderer.upload_particles(simulation.pos_x(), simulation.pos_y(),
+                              simulation.classes());
 
     glfwGetFramebufferSize(window, &w, &h);
     glViewport(0, 0, w, h);
@@ -210,6 +238,9 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action,
   if (action == GLFW_PRESS) {
     input->dragging = true;
     glfwGetCursorPos(window, &input->last_x, &input->last_y);
+    input->cursor_x = input->last_x;
+    input->cursor_y = input->last_y;
+    input->cursor_valid = true;
   } else if (action == GLFW_RELEASE) {
     input->dragging = false;
   }
@@ -218,14 +249,24 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action,
 static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
   InputState *input =
       static_cast<InputState *>(glfwGetWindowUserPointer(window));
-  if (input == nullptr || !input->dragging || input->camera == nullptr) {
+  if (input == nullptr) {
+    return;
+  }
+  input->cursor_x = xpos;
+  input->cursor_y = ypos;
+  input->cursor_valid = true;
+}
+
+static void apply_mouse_drag(InputState &input, Camera &camera,
+                             GLFWwindow *window) {
+  if (!input.dragging || !input.cursor_valid) {
     return;
   }
 
-  const double dx = xpos - input->last_x;
-  const double dy = ypos - input->last_y;
-  input->last_x = xpos;
-  input->last_y = ypos;
+  const double dx = input.cursor_x - input.last_x;
+  const double dy = input.cursor_y - input.last_y;
+  input.last_x = input.cursor_x;
+  input.last_y = input.cursor_y;
 
   if (dx == 0.0 && dy == 0.0) {
     return;
@@ -240,14 +281,14 @@ static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos) {
   const float ndc_dx = static_cast<float>(2.0 * dx / w);
   const float ndc_dy = static_cast<float>(-2.0 * dy / h);
   const float aspect = static_cast<float>(w) / static_cast<float>(h);
-  const float scale = input->camera->get_scale();
-  const float zoom = input->camera->get_zoom();
+  const float scale = camera.get_scale();
+  const float zoom = camera.get_zoom();
 
   const float world_dx = ndc_dx * aspect * scale * zoom;
   const float world_dy = ndc_dy * scale * zoom;
 
   // Dragging moves the world with the cursor (camera moves opposite).
-  input->camera->move(-world_dx, -world_dy);
+  camera.move(-world_dx, -world_dy);
 }
 
 static void scroll_callback(GLFWwindow *window, double xoffset,
@@ -283,10 +324,11 @@ static void scroll_callback(GLFWwindow *window, double xoffset,
   const float world_y = input->camera->get_y() + ndc_y * scale * zoom_before;
 
   const float zoom_stride = 0.1f * static_cast<float>(std::abs(yoffset));
+  const float clamped_stride = std::min(0.5f, zoom_stride);
   if (yoffset > 0.0) {
-    input->camera->zoom_in(zoom_stride);
+    input->camera->zoom_in(clamped_stride);
   } else {
-    input->camera->zoom_out(zoom_stride);
+    input->camera->zoom_out(clamped_stride);
   }
 
   const float zoom_after = input->camera->get_zoom();

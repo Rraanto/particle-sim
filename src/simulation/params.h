@@ -20,7 +20,7 @@ struct SimulationParams {
   float bounds_max_y = 1.0f;
 
   float time_step = 0.016f;
-  float damping = 0.98f;
+  float damping = 1.0f;
   float max_speed = 4.0f;
 
   float interaction_radius = 0.2f;

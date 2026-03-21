@@ -17,8 +17,8 @@ private:
   // center coordinates
 
   // minimum zoom factor allowed
-  float _min_zoom_factor = 1e-20;
-  float _max_zoom_factor = 10.0;
+  float _min_zoom_factor = 0.05f;
+  float _max_zoom_factor = 20.0f;
 
   float _center_x, _center_y;
   float _zoom_factor; // the smaller the zoom factor the closer things appear
@@ -26,7 +26,7 @@ private:
 
 public:
   Camera(const float &x, const float &y)
-      : _center_x(x), _center_y(y), _zoom_factor(1.0), _scale(10.0) {}
+      : _center_x(x), _center_y(y), _zoom_factor(1.0), _scale(1.0) {}
 
   float get_x() const;
   float get_y() const;
