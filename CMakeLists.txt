@@ -30,6 +30,9 @@ target_include_directories(glad
 add_library(camera STATIC src/camera/camera.cpp)
 target_include_directories(camera PUBLIC src/camera)
 
+add_library(cliutils STATIC src/cliutils/cliutils.cpp)
+target_include_directories(cliutils PUBLIC src/cliutils)
+
 add_library(compiler STATIC
   src/compiler/compiler/compiler.cpp
   src/compiler/preprocessor/preprocessor.cpp
@@ -49,6 +52,7 @@ add_executable(main src/main.cpp)
 target_link_libraries(main 
   PRIVATE 
   camera
+  cliutils
   glfw 
   glad
   compiler
@@ -90,6 +94,7 @@ set(PROJECT_PEDANTIC_WARNINGS
 )
 
 target_compile_options(camera PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
+target_compile_options(cliutils PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(compiler PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(render PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(simulation PRIVATE ${PROJECT_PEDANTIC_WARNINGS})

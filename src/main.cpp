@@ -12,6 +12,7 @@
 #include "render/render.h"
 #include "simulation/simulation.h"
 #include "camera.h"
+#include "cliutils/cliutils.h"
 
 static void error_callback(int error, const char *description);
 static void key_callback(GLFWwindow *window, int key, int scancode, int action,
@@ -47,7 +48,14 @@ static void apply_input(const InputState &input, Camera &camera);
 static void apply_mouse_drag(InputState &input, Camera &camera,
                              GLFWwindow *window);
 
-int main() {
+int main(int argc, char **argv) {
+
+  SimConfig sim_config;
+  bool show_help = false;
+  if (!parse_sim_config(argc, argv, sim_config, show_help)) {
+    print_usage(argv[0]);
+    return show_help ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
 
   const int WIDTH = 1000, HEIGHT = 800;
 
@@ -107,8 +115,16 @@ int main() {
   glfwSetCursorPosCallback(window, cursor_pos_callback);
   glfwSetScrollCallback(window, scroll_callback);
 
-  const size_t kParticles = 1000;
-  const size_t kClasses = 1;
+  const size_t kClasses = sim_config.class_count;
+  const size_t kParticlesPerClass = sim_config.particles_per_class;
+  const size_t kParticles = kClasses * kParticlesPerClass;
+  if (kParticlesPerClass != 0 && kParticles / kClasses != kParticlesPerClass) {
+    std::cerr << "Particle count overflow (classes * per-class too large)\n";
+    renderer.shutdown();
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    return EXIT_FAILURE;
+  }
   Simulation simulation(kParticles, kClasses);
   if (simulation.size() != kParticles || simulation.class_count() != kClasses) {
     std::cerr << "Simulation init failed: expected " << kParticles
@@ -121,13 +137,26 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  if (sim_config.attraction_enabled) {
+    ForceParams force_params;
+    force_params.class_count = kClasses;
+    force_params.strength = sim_config.attraction_strength;
+    force_params.attraction.assign(kClasses * kClasses, 1.0f);
+    simulation.set_force_params(force_params);
+  }
+
   std::mt19937 rng(std::random_device{}());
   std::uniform_real_distribution<float> dist_x(-1.0f, 1.0f);
   std::uniform_real_distribution<float> dist_y(-1.0f, 1.0f);
-  for (size_t i = 0; i < kParticles; ++i) {
-    const float x = dist_x(rng);
-    const float y = dist_y(rng);
-    simulation.set_particle(i, x, y, 0.5f, 0.5f, 0);
+  size_t index = 0;
+  for (size_t class_id = 0; class_id < kClasses; ++class_id) {
+    for (size_t p = 0; p < kParticlesPerClass; ++p) {
+      const float x = dist_x(rng);
+      const float y = dist_y(rng);
+      simulation.set_particle(index, x, y, 0.0f, 0.0f,
+                              static_cast<int>(class_id));
+      ++index;
+    }
   }
 
   if (simulation.pos_x().size() != simulation.pos_y().size() ||

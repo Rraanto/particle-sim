@@ -192,6 +192,7 @@ void Simulation::step(float dt) {
     return;
   }
 
+  // radius of considered neighborhood
   const float radius = _params.interaction_radius;
   const float radius_sq = radius * radius;
 
