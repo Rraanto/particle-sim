@@ -1,7 +1,6 @@
 #version 460 core
 
 out vec4 FragColor; // color output 
-in vec2 vPos; // read from vertex shader output
 flat in int vClass;
 
 // uniforms 
@@ -11,8 +10,11 @@ uniform float uAspect; // aspect ratio
 uniform float uTime; 
 
 void main() {
-  float scale = uScale; 
-  vec2 position = vPos; 
+  vec2 coord = gl_PointCoord * 2.0 - 1.0;
+  float dist_sq = dot(coord, coord);
+  if (dist_sq > 1.0) {
+    discard;
+  }
 
   vec3 palette[8] = vec3[8](
     vec3(0.90, 0.25, 0.25), // red

@@ -18,6 +18,7 @@ struct RenderParticle {
   float x = 0.0f;
   float y = 0.0f;
   int class_id = 0;
+  float radius = 1.0f;
 };
 
 class ParticleRenderer {
@@ -56,7 +57,8 @@ public:
    */
   void upload_particles(const std::vector<float> &pos_x,
                         const std::vector<float> &pos_y,
-                        std::vector<int> classes);
+                        const std::vector<int> &classes,
+                        const std::vector<float> &class_masses);
 
   /*
    * draws the specified amount of particles

@@ -63,6 +63,8 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
   this->_u_aspect = glGetUniformLocation(this->_shader_program, "uAspect");
   this->_u_time = glGetUniformLocation(this->_shader_program, "uTime");
 
+  glEnable(GL_PROGRAM_POINT_SIZE);
+
   // VAO and VBO setup
   this->_vao = 0;
   glGenVertexArrays(1, &this->_vao);
@@ -88,6 +90,10 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
                          (void *)offsetof(RenderParticle, class_id));
   glEnableVertexAttribArray(1);
 
+  glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle),
+                        (void *)offsetof(RenderParticle, radius));
+  glEnableVertexAttribArray(2);
+
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
@@ -96,7 +102,8 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
 
 void ParticleRenderer::upload_particles(const std::vector<float> &pos_x,
                                         const std::vector<float> &pos_y,
-                                        std::vector<int> classes) {
+                                        const std::vector<int> &classes,
+                                        const std::vector<float> &class_masses) {
 
   // count amount of particle classes, abort if none
   size_t count = std::min(pos_x.size(), pos_y.size());
@@ -121,13 +128,24 @@ void ParticleRenderer::upload_particles(const std::vector<float> &pos_x,
 
   std::vector<RenderParticle> particles;
   particles.reserve(count);
+  constexpr float kBaseRadius = 2.0f;
   for (size_t i = 0; i < count; ++i) {
     RenderParticle p;
     p.x = pos_x[i];
     p.y = pos_y[i];
+    float mass = 1.0f;
     if (i < classes.size()) {
       p.class_id = classes[i];
+      const int class_id = classes[i];
+      if (class_id >= 0 &&
+          static_cast<size_t>(class_id) < class_masses.size()) {
+        mass = class_masses[static_cast<size_t>(class_id)];
+      }
     }
+    if (mass < 0.0f) {
+      mass = 0.0f;
+    }
+    p.radius = std::max(0.5f, mass * kBaseRadius);
     particles.push_back(p);
   }
 

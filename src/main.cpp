@@ -131,6 +131,7 @@ int main(int argc, char **argv) {
   sim_params.interaction_radius = sim_config.interaction_radius;
   sim_params.damping = sim_config.damping;
   sim_params.grid_cell_size = sim_config.grid_cell_size;
+  sim_params.wrap_bounds = true;
 
   std::vector<ClassParams> class_params(kClasses);
   ForceParams force_params;
@@ -152,7 +153,18 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  // random floats generator
   std::mt19937 rng(std::random_device{}());
+  std::uniform_real_distribution<float> mass(1.0f, 5.0f);
+
+  std::vector<float> class_masses;
+  class_masses.reserve(class_params.size());
+  for (size_t i = 0; i < class_params.size() - 1; i++) {
+    // generate random masses for each mass
+    class_masses.push_back(mass(rng));
+  }
+  class_masses.push_back(50.0f); // a "sun"
+
   std::uniform_real_distribution<float> dist_x(-1.0f, 1.0f);
   std::uniform_real_distribution<float> dist_y(-1.0f, 1.0f);
   size_t index = 0;
@@ -178,8 +190,7 @@ int main(int argc, char **argv) {
   }
 
   renderer.upload_particles(simulation.pos_x(), simulation.pos_y(),
-                            simulation.classes());
-  glPointSize(3.0f);
+                            simulation.classes(), class_masses);
   /*
    * main loop
    */
@@ -210,7 +221,7 @@ int main(int argc, char **argv) {
       accumulator -= fixed_dt;
     }
     renderer.upload_particles(simulation.pos_x(), simulation.pos_y(),
-                              simulation.classes());
+                              simulation.classes(), class_masses);
 
     glfwGetFramebufferSize(window, &w, &h);
     glViewport(0, 0, w, h);
