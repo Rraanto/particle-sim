@@ -8,6 +8,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-g -ggdb3 -O0 -fno-omit-frame-pointer)
 
+# OpenMP (parallelization)
+find_package(OpenMP)
+
 # external dependencies 
 # glfw's own CMakeLists.txt does the job 
 # target name is glfw
@@ -46,6 +49,9 @@ target_link_libraries(render PRIVATE glfw glad compiler camera)
 
 add_library(simulation STATIC src/simulation/simulation.cpp src/simulation/spatial_grid.cpp)
 target_include_directories(simulation PUBLIC src/simulation)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(simulation PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 # Main executable 
 add_executable(main src/main.cpp)
@@ -59,6 +65,9 @@ target_link_libraries(main
   render
   simulation
 )
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
+endif()
 target_compile_definitions(main PRIVATE SHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders") # expose to executables to load shaders at runtime
 
 # strict warnings on project code only 

@@ -18,6 +18,7 @@ struct SimConfig {
   float interaction_radius = 1.0f;
   float damping = 1.0f;
   float grid_cell_size = 0.2f;
+  size_t fpps = 1;
 };
 
 /*

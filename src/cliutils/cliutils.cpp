@@ -8,9 +8,9 @@ void print_usage(const char *exe_name) {
   std::cout << "Usage: " << exe_name
             << " [--classes N] [--per-class N] [--attract yes|no]"
                " [--strength FLOAT] [--radius FLOAT] [--damping FLOAT]"
-               " [--grid FLOAT]\n"
+               " [--grid FLOAT] [--fpps N]\n"
             << "Defaults: --classes 1 --per-class 1000 --attract no --strength "
-               "1.0 --radius 1.0 --damping 1.0 --grid (radius)\n";
+               "1.0 --radius 1.0 --damping 1.0 --grid (radius) --fpps 1\n";
 }
 
 static bool parse_size_arg(const char *value, size_t &out_value) {
@@ -139,6 +139,17 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
       grid_set = true;
       continue;
     }
+    if (arg == "--fpps") {
+      if (i + 1 >= argc) {
+        std::cerr << "--fpps expects a value\n";
+        return false;
+      }
+      if (!parse_size_arg(argv[++i], out_config.fpps)) {
+        std::cerr << "Invalid --fpps value\n";
+        return false;
+      }
+      continue;
+    }
     std::cerr << "Unknown argument: " << arg << "\n";
     return false;
   }
@@ -164,6 +175,10 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
   }
   if (out_config.grid_cell_size <= 0.0f) {
     std::cerr << "--grid must be > 0\n";
+    return false;
+  }
+  if (out_config.fpps == 0) {
+    std::cerr << "--fpps must be >= 1\n";
     return false;
   }
   return true;

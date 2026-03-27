@@ -100,10 +100,9 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
   return true;
 }
 
-void ParticleRenderer::upload_particles(const std::vector<float> &pos_x,
-                                        const std::vector<float> &pos_y,
-                                        const std::vector<int> &classes,
-                                        const std::vector<float> &class_masses) {
+void ParticleRenderer::upload_particles(
+    const std::vector<float> &pos_x, const std::vector<float> &pos_y,
+    const std::vector<int> &classes, const std::vector<float> &class_masses) {
 
   // count amount of particle classes, abort if none
   size_t count = std::min(pos_x.size(), pos_y.size());

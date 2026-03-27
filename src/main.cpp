@@ -56,6 +56,7 @@ int main(int argc, char **argv) {
     print_usage(argv[0]);
     return show_help ? EXIT_SUCCESS : EXIT_FAILURE;
   }
+  const size_t fpps = sim_config.fpps;
 
   const int WIDTH = 1000, HEIGHT = 800;
 
@@ -155,15 +156,14 @@ int main(int argc, char **argv) {
 
   // random floats generator
   std::mt19937 rng(std::random_device{}());
-  std::uniform_real_distribution<float> mass(1.0f, 5.0f);
+  std::uniform_real_distribution<float> mass(1.0f, 1.2f);
 
   std::vector<float> class_masses;
   class_masses.reserve(class_params.size());
-  for (size_t i = 0; i < class_params.size() - 1; i++) {
+  for (size_t i = 0; i < class_params.size(); i++) {
     // generate random masses for each mass
     class_masses.push_back(mass(rng));
   }
-  class_masses.push_back(50.0f); // a "sun"
 
   std::uniform_real_distribution<float> dist_x(-1.0f, 1.0f);
   std::uniform_real_distribution<float> dist_y(-1.0f, 1.0f);
@@ -197,6 +197,7 @@ int main(int argc, char **argv) {
   double last_time = glfwGetTime();
   double accumulator = 0.0;
   const double fixed_dt = 1.0 / 60.0;
+  size_t frame_index = 0;
   while (!glfwWindowShouldClose(window)) {
     int w, h;
     glfwPollEvents();
@@ -215,10 +216,13 @@ int main(int argc, char **argv) {
     if (frame_dt > 0.25) {
       frame_dt = 0.25;
     }
-    accumulator += frame_dt;
-    while (accumulator >= fixed_dt) {
-      simulation.step(static_cast<float>(fixed_dt));
-      accumulator -= fixed_dt;
+    ++frame_index;
+    if (frame_index % fpps == 0) {
+      accumulator += frame_dt;
+      while (accumulator >= fixed_dt) {
+        simulation.step(static_cast<float>(fixed_dt));
+        accumulator -= fixed_dt;
+      }
     }
     renderer.upload_particles(simulation.pos_x(), simulation.pos_y(),
                               simulation.classes(), class_masses);
