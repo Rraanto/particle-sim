@@ -10,7 +10,8 @@ void print_usage(const char *exe_name) {
                " [--strength FLOAT] [--radius FLOAT] [--damping FLOAT]"
                " [--grid FLOAT] [--fpps N]\n"
             << "Defaults: --classes 1 --per-class 1000 --attract no --strength "
-               "1.0 --radius 1.0 --damping 1.0 --grid (radius) --fpps 1\n";
+               "0.0 --radius 1.0 --damping 1.0 --grid (radius) --fpps 1\n"
+            << "--fpps allowed values: 1, 2, 4, 8, 12\n";
 }
 
 static bool parse_size_arg(const char *value, size_t &out_value) {
@@ -49,6 +50,10 @@ static bool parse_bool_arg(const std::string &value, bool &out_value) {
     return true;
   }
   return false;
+}
+
+static bool is_valid_fpps(size_t fpps) {
+  return fpps == 1u || fpps == 2u || fpps == 4u || fpps == 8u || fpps == 12u;
 }
 
 bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
@@ -179,6 +184,10 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
   }
   if (out_config.fpps == 0) {
     std::cerr << "--fpps must be >= 1\n";
+    return false;
+  }
+  if (!is_valid_fpps(out_config.fpps)) {
+    std::cerr << "--fpps must be one of: 1, 2, 4, 8, 12\n";
     return false;
   }
   return true;

@@ -86,13 +86,17 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
                         (void *)0);
   glEnableVertexAttribArray(0);
 
-  glVertexAttribIPointer(1, 1, GL_INT, sizeof(RenderParticle),
-                         (void *)offsetof(RenderParticle, class_id));
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(RenderParticle),
+                        (void *)offsetof(RenderParticle, r));
   glEnableVertexAttribArray(1);
 
-  glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle),
-                        (void *)offsetof(RenderParticle, radius));
+  glVertexAttribIPointer(2, 1, GL_INT, sizeof(RenderParticle),
+                         (void *)offsetof(RenderParticle, class_id));
   glEnableVertexAttribArray(2);
+
+  glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle),
+                        (void *)offsetof(RenderParticle, radius));
+  glEnableVertexAttribArray(3);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
@@ -102,7 +106,8 @@ bool ParticleRenderer::init(const std::filesystem::path &vertex_shader_path,
 
 void ParticleRenderer::upload_particles(
     const std::vector<float> &pos_x, const std::vector<float> &pos_y,
-    const std::vector<int> &classes, const std::vector<float> &class_masses) {
+    const std::vector<int> &classes,
+    const std::vector<ClassParams> &class_params) {
 
   // count amount of particle classes, abort if none
   size_t count = std::min(pos_x.size(), pos_y.size());
@@ -133,12 +138,20 @@ void ParticleRenderer::upload_particles(
     p.x = pos_x[i];
     p.y = pos_y[i];
     float mass = 1.0f;
+    p.r = 1.0f;
+    p.g = 1.0f;
+    p.b = 1.0f;
     if (i < classes.size()) {
       p.class_id = classes[i];
       const int class_id = classes[i];
       if (class_id >= 0 &&
-          static_cast<size_t>(class_id) < class_masses.size()) {
-        mass = class_masses[static_cast<size_t>(class_id)];
+          static_cast<size_t>(class_id) < class_params.size()) {
+        const ClassParams &class_param =
+            class_params[static_cast<size_t>(class_id)];
+        mass = class_param.mass;
+        p.r = class_param.r;
+        p.g = class_param.g;
+        p.b = class_param.b;
       }
     }
     if (mass < 0.0f) {

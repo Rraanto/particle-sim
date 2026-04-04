@@ -6,10 +6,41 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_options(-g -ggdb3 -O0 -fno-omit-frame-pointer)
+
+# Build type configuration
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# Debug options (only applied in Debug builds)
+add_compile_options($<$<CONFIG:Debug>:-g>)
+add_compile_options($<$<CONFIG:Debug>:-ggdb3>)
+add_compile_options($<$<CONFIG:Debug>:-O0>)
+add_compile_options($<$<CONFIG:Debug>:-fno-omit-frame-pointer>)
 
 # OpenMP (parallelization)
 find_package(OpenMP)
+
+# ImGui library
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
+add_library(imgui STATIC
+  ${IMGUI_DIR}/imgui.cpp
+  ${IMGUI_DIR}/imgui_draw.cpp
+  ${IMGUI_DIR}/imgui_tables.cpp
+  ${IMGUI_DIR}/imgui_widgets.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_link_libraries(imgui PUBLIC glfw glad)
+
+# Release optimization flags
+set(RELEASE_OPTIMIZATION_FLAGS
+  -O3
+  -march=native
+  -ffast-math
+  -flto
+)
 
 # external dependencies 
 # glfw's own CMakeLists.txt does the job 
@@ -44,31 +75,39 @@ target_include_directories(compiler PUBLIC src/compiler)
 target_link_libraries(compiler PRIVATE glad)
 
 add_library(render STATIC src/render/render.cpp)
-target_include_directories(render PRIVATE src/render src/camera src/compiler/compiler)
+target_include_directories(render PUBLIC src/render src/camera src/compiler/compiler src/simulation)
 target_link_libraries(render PRIVATE glfw glad compiler camera)
 
 add_library(simulation STATIC src/simulation/simulation.cpp src/simulation/spatial_grid.cpp)
 target_include_directories(simulation PUBLIC src/simulation)
+target_compile_options(simulation PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)
+target_link_options(simulation PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)
 if(OpenMP_CXX_FOUND)
   target_link_libraries(simulation PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-# Main executable 
+# GUIManager library
+add_library(gui STATIC src/gui/gui_manager.cpp)
+target_include_directories(gui PUBLIC src/gui src/simulation src/render external/imgui)
+target_link_libraries(gui PUBLIC imgui simulation render)
+
+add_library(app STATIC src/app/app.cpp)
+target_include_directories(app PUBLIC src/app src/camera src/cliutils src/gui src/render src/simulation)
+target_link_libraries(app PRIVATE camera cliutils glfw glad render simulation gui)
+target_compile_definitions(app PRIVATE SHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+target_compile_options(app PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)
+target_link_options(app PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)
+
+# Main executable
 add_executable(main src/main.cpp)
-target_link_libraries(main 
-  PRIVATE 
-  camera
+target_link_libraries(main
+  PRIVATE
+  app
   cliutils
-  glfw 
-  glad
-  compiler
-  render
-  simulation
 )
 if(OpenMP_CXX_FOUND)
   target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
 endif()
-target_compile_definitions(main PRIVATE SHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders") # expose to executables to load shaders at runtime
 
 # strict warnings on project code only 
 set(PROJECT_PEDANTIC_WARNINGS
@@ -107,4 +146,5 @@ target_compile_options(cliutils PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(compiler PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(render PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(simulation PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
+target_compile_options(app PRIVATE ${PROJECT_PEDANTIC_WARNINGS})
 target_compile_options(main PRIVATE ${PROJECT_PEDANTIC_WARNINGS})

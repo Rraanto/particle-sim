@@ -3,13 +3,25 @@
 #include <cmath>
 #include <random>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 Simulation::Simulation(size_t particles, size_t classes)
     : _params(), _class_params(classes), _force_params() {
   _params.particle_count = particles;
   _params.class_count = classes;
+
   resize(particles, classes);
   _force_params.class_count = classes;
   _force_params.attraction.assign(classes * classes, 0.0f);
+
+  // Automatic grid tuning: default grid_cell_size to interaction_radius
+  // if not explicitly set (<= 0)
+  if (_params.grid_cell_size <= 0.0f) {
+    _params.grid_cell_size = _params.interaction_radius;
+  }
+
   _grid.reset(_params.grid_cell_size, _params.bounds_min_x,
               _params.bounds_min_y, _params.bounds_max_x, _params.bounds_max_y);
 }
@@ -19,6 +31,13 @@ Simulation::Simulation(const SimulationParams &params,
                        const ForceParams &force_params)
     : _params(params), _class_params(class_params),
       _force_params(force_params) {
+
+  // Automatic grid tuning: default grid_cell_size to interaction_radius
+  // if not explicitly set (<= 0)
+  if (_params.grid_cell_size <= 0.0f) {
+    _params.grid_cell_size = _params.interaction_radius;
+  }
+
   resize(_params.particle_count, _params.class_count);
   _grid.reset(_params.grid_cell_size, _params.bounds_min_x,
               _params.bounds_min_y, _params.bounds_max_x, _params.bounds_max_y);
@@ -69,6 +88,45 @@ void Simulation::set_force_params(const ForceParams &force_params) {
 void Simulation::set_class_params(
     const std::vector<ClassParams> &class_params) {
   _class_params = class_params;
+}
+
+void Simulation::set_attraction_strength(float strength) {
+  _force_params.strength = strength;
+}
+
+void Simulation::set_attraction(size_t source, size_t target, float value) {
+  _force_params.set(source, target, value);
+}
+
+void Simulation::set_class_color(size_t class_index, float r, float g,
+                                 float b) {
+  if (class_index >= _class_params.size()) {
+    return;
+  }
+
+  _class_params[class_index].r = r;
+  _class_params[class_index].g = g;
+  _class_params[class_index].b = b;
+}
+
+void Simulation::set_class_mass(size_t class_index, float mass) {
+  if (class_index >= _class_params.size()) {
+    return;
+  }
+
+  _class_params[class_index].mass = mass;
+}
+
+void Simulation::set_damping(float damping) {
+  _params.damping = damping;
+}
+
+void Simulation::set_interaction_radius(float radius) {
+  _params.interaction_radius = radius;
+}
+
+void Simulation::set_max_speed(float max_speed) {
+  _params.max_speed = max_speed;
 }
 
 void Simulation::set_particle(size_t index, float x, float y, float vx,
@@ -125,13 +183,46 @@ void Simulation::randomize(unsigned int seed) {
   }
 }
 
+void Simulation::reset_particles(unsigned int seed) {
+  if (_size == 0) {
+    return;
+  }
+
+  std::mt19937 rng;
+  if (seed == 0) {
+    std::random_device device;
+    rng.seed(device());
+  } else {
+    rng.seed(seed);
+  }
+
+  std::uniform_real_distribution<float> pos_x_dist(_params.bounds_min_x,
+                                                   _params.bounds_max_x);
+  std::uniform_real_distribution<float> pos_y_dist(_params.bounds_min_y,
+                                                   _params.bounds_max_y);
+
+  for (size_t i = 0; i < _size; ++i) {
+    _pos_x[i] = pos_x_dist(rng);
+    _pos_y[i] = pos_y_dist(rng);
+    _vel_x[i] = 0.0f;
+    _vel_y[i] = 0.0f;
+  }
+}
+
 void Simulation::rebuild_grid() {
+  // Automatic grid tuning: if grid_cell_size was defaulted to interaction_radius
+  // and interaction_radius may have changed, re-apply the default
+  if (_params.grid_cell_size <= 0.0f) {
+    _params.grid_cell_size = _params.interaction_radius;
+  }
+
   _grid.reset(_params.grid_cell_size, _params.bounds_min_x,
               _params.bounds_min_y, _params.bounds_max_x, _params.bounds_max_y);
   _grid.build(_pos_x, _pos_y);
 }
 
 void Simulation::apply_bounds(size_t index) {
+  // borders wrap like a torus
   if (_params.wrap_bounds) {
     if (_pos_x[index] < _params.bounds_min_x) {
       _pos_x[index] = _params.bounds_max_x;
@@ -195,18 +286,40 @@ void Simulation::step(float dt) {
   // radius of considered neighborhood
   const float radius = _params.interaction_radius;
   const float radius_sq = radius * radius;
+  // Precompute 1/radius for the optimized force formula
+  const float inv_radius = (radius > 0.0f) ? 1.0f / radius : 0.0f;
 
   rebuild_grid();
 
-  std::vector<size_t> neighbors;
-  neighbors.reserve(64);
+  // Thread-local neighbor storage to prevent data races and reallocations
+  #ifdef _OPENMP
+  const size_t num_threads = static_cast<size_t>(omp_get_max_threads());
+  #else
+  const size_t num_threads = 1;
+  #endif
 
+  std::vector<std::vector<size_t>> thread_neighbors(num_threads);
+  for (auto& neighbors : thread_neighbors) {
+    neighbors.reserve(128);
+  }
+
+  #pragma omp parallel for schedule(dynamic, 64)
   for (size_t i = 0; i < _size; ++i) {
     float ax = 0.0f;
     float ay = 0.0f;
 
+    #ifdef _OPENMP
+    const size_t thread_id = static_cast<size_t>(omp_get_thread_num());
+    #else
+    const size_t thread_id = 0;
+    #endif
+
+    std::vector<size_t>& neighbors = thread_neighbors[thread_id];
+
     if (_force_params.valid() && radius > 0.0f) {
       _grid.query(_pos_x[i], _pos_y[i], radius, neighbors);
+      const size_t class_i = static_cast<size_t>(_classes[i]);
+
       for (size_t idx = 0; idx < neighbors.size(); ++idx) {
         const size_t j = neighbors[idx];
         if (j == i) {
@@ -215,24 +328,32 @@ void Simulation::step(float dt) {
         const float dx = _pos_x[j] - _pos_x[i];
         const float dy = _pos_y[j] - _pos_y[i];
         const float dist_sq = dx * dx + dy * dy;
+
+        // Early-out: skip if outside interaction radius or zero distance
         if (dist_sq <= 0.0f || dist_sq > radius_sq) {
           continue;
         }
+
+        // Optimized force calculation: dx * (force * (1.0f/dist - 1.0f/radius))
+        // This minimizes divisions compared to the original formula
         const float dist = std::sqrt(dist_sq);
-        const float influence = 1.0f - (dist / radius);
-        const float force = _force_params.get(static_cast<size_t>(_classes[i]),
-                                              static_cast<size_t>(_classes[j]));
         const float inv_dist = 1.0f / dist;
-        ax += dx * inv_dist * force * influence;
-        ay += dy * inv_dist * force * influence;
+        const float force = _force_params.get(class_i,
+                                              static_cast<size_t>(_classes[j]));
+        const float force_factor = force * (inv_dist - inv_radius);
+        ax += dx * force_factor;
+        ay += dy * force_factor;
       }
     }
 
     _vel_x[i] += ax * dt;
     _vel_y[i] += ay * dt;
 
-    _vel_x[i] *= _params.damping;
-    _vel_y[i] *= _params.damping;
+    // The UI defines damping as a user-facing control around 1.0f:
+    // 0.5 accelerates, 1.0 leaves velocity unchanged, 1.5 decelerates.
+    const float damping_factor = 2.0f - _params.damping;
+    _vel_x[i] *= damping_factor;
+    _vel_y[i] *= damping_factor;
 
     limit_speed(i);
 
