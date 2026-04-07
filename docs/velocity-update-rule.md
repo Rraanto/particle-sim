@@ -112,7 +112,7 @@ compute_acceleration(i, ax, ay);
 
 This keeps the per-frame velocity rule isolated and easier to iterate on.
 
-## Notes And Gotchas
+## Notes
 
 - `dt` must be positive; `step(dt)` returns early if `dt <= 0`.
 - Damping is applied *after* acceleration, so values close to `1.0f` preserve

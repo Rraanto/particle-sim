@@ -117,9 +117,7 @@ void Simulation::set_class_mass(size_t class_index, float mass) {
   _class_params[class_index].mass = mass;
 }
 
-void Simulation::set_damping(float damping) {
-  _params.damping = damping;
-}
+void Simulation::set_damping(float damping) { _params.damping = damping; }
 
 void Simulation::set_interaction_radius(float radius) {
   _params.interaction_radius = radius;
@@ -128,6 +126,10 @@ void Simulation::set_interaction_radius(float radius) {
 void Simulation::set_max_speed(float max_speed) {
   _params.max_speed = max_speed;
 }
+
+void Simulation::set_wrap_bounds(bool wrap) { _params.wrap_bounds = wrap; }
+
+void Simulation::set_time_step(float dt) { _params.time_step = dt; }
 
 void Simulation::set_particle(size_t index, float x, float y, float vx,
                               float vy, int particle_class) {
@@ -210,8 +212,9 @@ void Simulation::reset_particles(unsigned int seed) {
 }
 
 void Simulation::rebuild_grid() {
-  // Automatic grid tuning: if grid_cell_size was defaulted to interaction_radius
-  // and interaction_radius may have changed, re-apply the default
+  // Automatic grid tuning: if grid_cell_size was defaulted to
+  // interaction_radius and interaction_radius may have changed, re-apply the
+  // default
   if (_params.grid_cell_size <= 0.0f) {
     _params.grid_cell_size = _params.interaction_radius;
   }
@@ -291,30 +294,30 @@ void Simulation::step(float dt) {
 
   rebuild_grid();
 
-  // Thread-local neighbor storage to prevent data races and reallocations
-  #ifdef _OPENMP
+// Thread-local neighbor storage to prevent data races and reallocations
+#ifdef _OPENMP
   const size_t num_threads = static_cast<size_t>(omp_get_max_threads());
-  #else
+#else
   const size_t num_threads = 1;
-  #endif
+#endif
 
   std::vector<std::vector<size_t>> thread_neighbors(num_threads);
-  for (auto& neighbors : thread_neighbors) {
+  for (auto &neighbors : thread_neighbors) {
     neighbors.reserve(128);
   }
 
-  #pragma omp parallel for schedule(dynamic, 64)
+#pragma omp parallel for schedule(dynamic, 64)
   for (size_t i = 0; i < _size; ++i) {
     float ax = 0.0f;
     float ay = 0.0f;
 
-    #ifdef _OPENMP
+#ifdef _OPENMP
     const size_t thread_id = static_cast<size_t>(omp_get_thread_num());
-    #else
+#else
     const size_t thread_id = 0;
-    #endif
+#endif
 
-    std::vector<size_t>& neighbors = thread_neighbors[thread_id];
+    std::vector<size_t> &neighbors = thread_neighbors[thread_id];
 
     if (_force_params.valid() && radius > 0.0f) {
       _grid.query(_pos_x[i], _pos_y[i], radius, neighbors);
@@ -338,8 +341,8 @@ void Simulation::step(float dt) {
         // This minimizes divisions compared to the original formula
         const float dist = std::sqrt(dist_sq);
         const float inv_dist = 1.0f / dist;
-        const float force = _force_params.get(class_i,
-                                              static_cast<size_t>(_classes[j]));
+        const float force =
+            _force_params.get(class_i, static_cast<size_t>(_classes[j]));
         const float force_factor = force * (inv_dist - inv_radius);
         ax += dx * force_factor;
         ay += dy * force_factor;

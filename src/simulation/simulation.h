@@ -121,6 +121,8 @@ public:
   void set_damping(float damping);
   void set_interaction_radius(float radius);
   void set_max_speed(float max_speed);
+  void set_wrap_bounds(bool wrap);
+  void set_time_step(float dt);
 
   /*
    * Writes the full state of one particle.

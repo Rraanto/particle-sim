@@ -6,11 +6,12 @@
 
 void print_usage(const char *exe_name) {
   std::cout << "Usage: " << exe_name
-            << " [--classes N] [--per-class N] [--attract yes|no]"
-               " [--strength FLOAT] [--radius FLOAT] [--damping FLOAT]"
-               " [--grid FLOAT] [--fpps N]\n"
-            << "Defaults: --classes 1 --per-class 1000 --attract no --strength "
-               "0.0 --radius 1.0 --damping 1.0 --grid (radius) --fpps 1\n"
+            << " [--classes N] [--per-class N] [--strength FLOAT] [--radius FLOAT]"
+               " [--damping FLOAT] [--grid-size FLOAT] [--fpps N] [--max-speed FLOAT]"
+               " [--time-step FLOAT] [--wrap 0|1]\n"
+            << "Defaults: --classes 1 --per-class 1000 --strength 0.0 --radius 1.0 "
+               "--damping 1.0 --grid-size (radius) --fpps 1 --max-speed 4.0 "
+               "--time-step 0.016 --wrap 0\n"
             << "--fpps allowed values: 1, 2, 4, 8, 12\n";
 }
 
@@ -56,10 +57,13 @@ static bool is_valid_fpps(size_t fpps) {
   return fpps == 1u || fpps == 2u || fpps == 4u || fpps == 8u || fpps == 12u;
 }
 
-bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
+bool parse_sim_config(int argc, char **argv, AppConfig &out_config,
                       bool &out_show_help) {
   out_show_help = false;
   bool grid_set = false;
+  bool attract_enabled_set = false;
+  bool attract_enabled = false;
+
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "--help" || arg == "-h") {
@@ -88,15 +92,16 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
       }
       continue;
     }
-    if (arg == "--attract") {
+    if (arg == "--attract") { // Legacy flag, now maps to strength > 0 implicitly or is ignored
       if (i + 1 >= argc) {
         std::cerr << "--attract expects yes|no\n";
         return false;
       }
-      if (!parse_bool_arg(argv[++i], out_config.attraction_enabled)) {
+      if (!parse_bool_arg(argv[++i], attract_enabled)) {
         std::cerr << "Invalid --attract value (use yes|no)\n";
         return false;
       }
+      attract_enabled_set = true;
       continue;
     }
     if (arg == "--strength") {
@@ -132,13 +137,13 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
       }
       continue;
     }
-    if (arg == "--grid") {
+    if (arg == "--grid-size" || arg == "--grid") {
       if (i + 1 >= argc) {
-        std::cerr << "--grid expects a value\n";
+        std::cerr << arg << " expects a value\n";
         return false;
       }
       if (!parse_float_arg(argv[++i], out_config.grid_cell_size)) {
-        std::cerr << "Invalid --grid value\n";
+        std::cerr << "Invalid " << arg << " value\n";
         return false;
       }
       grid_set = true;
@@ -155,8 +160,47 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
       }
       continue;
     }
+    if (arg == "--max-speed") {
+      if (i + 1 >= argc) {
+        std::cerr << "--max-speed expects a value\n";
+        return false;
+      }
+      if (!parse_float_arg(argv[++i], out_config.max_speed)) {
+        std::cerr << "Invalid --max-speed value\n";
+        return false;
+      }
+      continue;
+    }
+    if (arg == "--time-step") {
+      if (i + 1 >= argc) {
+        std::cerr << "--time-step expects a value\n";
+        return false;
+      }
+      if (!parse_float_arg(argv[++i], out_config.time_step)) {
+        std::cerr << "Invalid --time-step value\n";
+        return false;
+      }
+      continue;
+    }
+    if (arg == "--wrap") {
+      if (i + 1 >= argc) {
+        std::cerr << "--wrap expects 0|1\n";
+        return false;
+      }
+      if (!parse_bool_arg(argv[++i], out_config.wrap_bounds)) {
+        std::cerr << "Invalid --wrap value (use 0|1 or yes|no)\n";
+        return false;
+      }
+      continue;
+    }
     std::cerr << "Unknown argument: " << arg << "\n";
     return false;
+  }
+
+  // Legacy handling: if --attract yes was used but strength is 0, set strength to 1.0 (or similar)
+  // Actually, let's just use it to enable default attraction if not set.
+  if (attract_enabled_set && attract_enabled && out_config.attraction_strength == 0.0f) {
+    out_config.attraction_strength = 1.0f;
   }
 
   if (out_config.class_count == 0) {
@@ -179,7 +223,7 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
     out_config.grid_cell_size = out_config.interaction_radius;
   }
   if (out_config.grid_cell_size <= 0.0f) {
-    std::cerr << "--grid must be > 0\n";
+    std::cerr << "Grid cell size must be > 0\n";
     return false;
   }
   if (out_config.fpps == 0) {
@@ -190,5 +234,15 @@ bool parse_sim_config(int argc, char **argv, SimConfig &out_config,
     std::cerr << "--fpps must be one of: 1, 2, 4, 8, 12\n";
     return false;
   }
+
+  out_config.synchronize_dimensions();
+
+  // If attraction was enabled via legacy flag or strength > 0, initialize matrix to 1.0
+  if (out_config.attraction_strength != 0.0f) {
+     for (auto& val : out_config.attraction_matrix) {
+       val = 1.0f;
+     }
+  }
+
   return true;
 }

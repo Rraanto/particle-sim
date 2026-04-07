@@ -65,7 +65,7 @@ add_library(camera STATIC src/camera/camera.cpp)
 target_include_directories(camera PUBLIC src/camera)
 
 add_library(cliutils STATIC src/cliutils/cliutils.cpp)
-target_include_directories(cliutils PUBLIC src/cliutils)
+target_include_directories(cliutils PUBLIC src/cliutils src)
 
 add_library(compiler STATIC
   src/compiler/compiler/compiler.cpp
@@ -79,7 +79,7 @@ target_include_directories(render PUBLIC src/render src/camera src/compiler/comp
 target_link_libraries(render PRIVATE glfw glad compiler camera)
 
 add_library(simulation STATIC src/simulation/simulation.cpp src/simulation/spatial_grid.cpp)
-target_include_directories(simulation PUBLIC src/simulation)
+target_include_directories(simulation PUBLIC src/simulation src)
 target_compile_options(simulation PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)
 target_link_options(simulation PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)
 if(OpenMP_CXX_FOUND)
@@ -88,11 +88,11 @@ endif()
 
 # GUIManager library
 add_library(gui STATIC src/gui/gui_manager.cpp)
-target_include_directories(gui PUBLIC src/gui src/simulation src/render external/imgui)
+target_include_directories(gui PUBLIC src/gui src/simulation src/render src external/imgui)
 target_link_libraries(gui PUBLIC imgui simulation render)
 
 add_library(app STATIC src/app/app.cpp)
-target_include_directories(app PUBLIC src/app src/camera src/cliutils src/gui src/render src/simulation)
+target_include_directories(app PUBLIC src/app src/camera src/cliutils src/gui src/render src/simulation src)
 target_link_libraries(app PRIVATE camera cliutils glfw glad render simulation gui)
 target_compile_definitions(app PRIVATE SHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 target_compile_options(app PRIVATE $<$<CONFIG:Release>:${RELEASE_OPTIMIZATION_FLAGS}>)

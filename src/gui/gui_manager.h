@@ -7,6 +7,8 @@
 
 #include <vector>
 
+#include "config/app_config.h"
+
 struct GLFWwindow;
 class Simulation;
 class ParticleRenderer;
@@ -22,16 +24,17 @@ class ParticleRenderer;
 class GUIManager {
 private:
   bool _initialized = false;
-  size_t _fpps = 1;
+
+  // Configuration state
+  AppConfig _active_config;
+  AppConfig _pending_config;
+  bool _restart_requested = false;
 
   // State for class editor
   int _selected_class = 0;
 
   // Timing for step time measurement
   double _last_step_time_ms = 0.0;
-
-  // Pause state
-  bool _paused = false;
 
 public:
   /*
@@ -63,6 +66,26 @@ public:
   void render(Simulation &sim, ParticleRenderer &renderer);
 
   /*
+   * Returns true when the user has requested a simulation restart via the GUI.
+   */
+  bool restart_requested() const { return _restart_requested; }
+
+  /*
+   * Returns the configuration to be used for the next simulation restart.
+   */
+  const AppConfig &pending_config() const { return _pending_config; }
+
+  /*
+   * Clears the restart request flag.
+   */
+  void clear_restart_request() { _restart_requested = false; }
+
+  /*
+   * Synchronizes the GUI internal state with a new active configuration.
+   */
+  void sync_config(const AppConfig &config);
+
+  /*
    * Returns true when Dear ImGui wants to consume mouse input this frame.
    * Callers should suppress camera or world interactions while true.
    */
@@ -77,7 +100,7 @@ public:
   /*
    * Returns whether the GUI currently requests the simulation to be paused.
    */
-  bool is_paused() const { return _paused; }
+  bool is_paused() const { return _active_config.paused; }
 
   /*
    * Sets the runtime frames-per-physics-step selector value.
@@ -88,7 +111,7 @@ public:
   /*
    * Returns the currently selected discrete frames-per-physics-step value.
    */
-  size_t fpps() const { return _fpps; }
+  size_t fpps() const { return _active_config.fpps; }
 
   /*
    * Updates the diagnostic value displayed for the last simulation step.
@@ -101,6 +124,11 @@ private:
    * Renders global simulation controls such as damping, radius, and pause.
    */
   void render_global_params_window(Simulation &sim);
+
+  /*
+   * Renders controls for structural parameters that require a restart.
+   */
+  void render_setup_window();
 
   /*
    * Renders controls for the currently selected particle class.

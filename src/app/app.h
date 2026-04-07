@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <memory>
 
-#include "cliutils.h"
+#include "config/app_config.h"
 
 struct GLFWwindow;
 class Camera;
@@ -56,6 +56,7 @@ private:
   std::unique_ptr<GUIManager> _gui_manager;
   std::unique_ptr<Camera> _camera;
   std::unique_ptr<Simulation> _simulation;
+  AppConfig _config;
   InputManager _input_manager;
 
   /*
@@ -71,10 +72,10 @@ private:
   bool init_renderer();
 
   /*
-   * Builds the initial simulation state from the parsed CLI configuration.
+   * Builds the initial simulation state from the current configuration.
    * Returns false when the requested particle/class counts are invalid.
    */
-  bool init_simulation(const SimConfig &config);
+  bool init_simulation();
 
   /*
    * Connects GLFW callbacks to the static bridge methods below.
@@ -165,10 +166,16 @@ public:
   ~App();
 
   /*
-   * Initializes all owned subsystems from CLI configuration.
+   * Initializes all owned subsystems from configuration.
    * Returns true only when windowing, rendering, GUI, and simulation are ready.
    */
-  bool init(const SimConfig &config);
+  bool init(const AppConfig &config);
+
+  /*
+   * Re-initializes the simulation with a new configuration.
+   * This results in a full reset of particle states.
+   */
+  void restart_simulation(const AppConfig &config);
 
   /*
    * Enters the main loop until the window requests closure.

@@ -27,7 +27,8 @@ constexpr double kFixedDt = 1.0 / 60.0;
 App::App() = default;
 App::~App() = default;
 
-bool App::init(const SimConfig &config) {
+bool App::init(const AppConfig &config) {
+  _config = config;
   _camera = std::make_unique<Camera>(0.0f, 0.0f);
   _renderer = std::make_unique<ParticleRenderer>();
   _gui_manager = std::make_unique<GUIManager>();
@@ -47,15 +48,24 @@ bool App::init(const SimConfig &config) {
     shutdown();
     return false;
   }
-  _gui_manager->set_fpps(config.fpps);
+  _gui_manager->sync_config(_config);
+  _gui_manager->set_fpps(_config.fpps);
 
-  if (!init_simulation(config)) {
+  if (!init_simulation()) {
     shutdown();
     return false;
   }
 
   register_callbacks();
   return true;
+}
+
+void App::restart_simulation(const AppConfig &config) {
+  _config = config;
+  _simulation.reset();
+  if (!init_simulation()) {
+    std::cerr << "Failed to restart simulation\n";
+  }
 }
 
 void App::run() {
@@ -155,9 +165,9 @@ bool App::init_renderer() {
   return true;
 }
 
-bool App::init_simulation(const SimConfig &config) {
-  const size_t class_count = config.class_count;
-  const size_t particles_per_class = config.particles_per_class;
+bool App::init_simulation() {
+  const size_t class_count = _config.class_count;
+  const size_t particles_per_class = _config.particles_per_class;
   const size_t particle_count = class_count * particles_per_class;
 
   if (particles_per_class != 0 &&
@@ -169,18 +179,25 @@ bool App::init_simulation(const SimConfig &config) {
   SimulationParams simulation_params;
   simulation_params.particle_count = particle_count;
   simulation_params.class_count = class_count;
-  simulation_params.interaction_radius = config.interaction_radius;
-  simulation_params.damping = config.damping;
-  simulation_params.grid_cell_size = config.grid_cell_size;
-  simulation_params.wrap_bounds = false;
+  simulation_params.interaction_radius = _config.interaction_radius;
+  simulation_params.damping = _config.damping;
+  simulation_params.grid_cell_size = _config.grid_cell_size;
+  simulation_params.max_speed = _config.max_speed;
+  simulation_params.time_step = _config.time_step;
+  simulation_params.wrap_bounds = _config.wrap_bounds;
 
   std::vector<ClassParams> class_params(class_count);
+  for (size_t i = 0; i < class_count; ++i) {
+    class_params[i].r = _config.classes[i].r;
+    class_params[i].g = _config.classes[i].g;
+    class_params[i].b = _config.classes[i].b;
+    class_params[i].mass = _config.classes[i].mass;
+  }
+
   ForceParams force_params;
   force_params.class_count = class_count;
-  if (config.attraction_enabled) {
-    force_params.strength = config.attraction_strength;
-    force_params.attraction.assign(class_count * class_count, 1.0f);
-  }
+  force_params.strength = _config.attraction_strength;
+  force_params.attraction = _config.attraction_matrix;
 
   _simulation = std::make_unique<Simulation>(simulation_params, class_params,
                                              force_params);
@@ -277,7 +294,13 @@ void App::render() {
                    : 1.0f;
   const float time_sec = static_cast<float>(glfwGetTime());
   _renderer->draw(_simulation->size(), *_camera, aspect, time_sec);
+
   _gui_manager->render(*_simulation, *_renderer);
+  if (_gui_manager->restart_requested()) {
+    restart_simulation(_gui_manager->pending_config());
+    _gui_manager->sync_config(_config);
+    _gui_manager->clear_restart_request();
+  }
 
   glfwSwapBuffers(_window);
 }
